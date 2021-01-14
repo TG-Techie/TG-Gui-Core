@@ -1,14 +1,31 @@
+# The MIT License (MIT)
+#
+# Copyright (c) 2021 Jonah Yolles-Murphy (TG-Techie)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
 import gc
 from .base import *
 
-class RootWrapper(Container):
 
-    def __init__(self, *,
-        screen:Screen,
-        size,
-        startup=False,
-        **kwargs
-    ):
+class RootWrapper(Container):
+    def __init__(self, *, screen: Screen, size, startup=False, **kwargs):
         assert len(size) == 2, f"expected two dimensions found, {size}"
 
         Widget.__init__(self)
@@ -24,7 +41,6 @@ class RootWrapper(Container):
         self._startup = startup
 
     def __call__(self, cls):
-        # self._std_startup_(cls)
         self._root_wid_inst = root_wid_inst = cls()
         self._nest_(root_wid_inst)
         return root_wid_inst
@@ -37,17 +53,15 @@ class RootWrapper(Container):
     def wrapped(self):
         return self._root_wid_inst
 
-    def _place_(self, coord:int, dims:int):
+    def _place_(self, coord: int, dims: int):
         assert dims > (0, 0), f"root's dims must be > (0, 0), found {dims}"
 
         was_on_screen = self.isrendered()
-        if was_on_screen: #if was_on_screen := self.isrendered()
+        if was_on_screen:
             self._derender_()
 
         self._placement_ = self._rel_placement_ = (0, 0) + dims
         self._abs_coord = (0, 0)
-
-        #self._root_wid_inst._place_(*self.fill)
 
         self._place_nested_()
 
@@ -79,14 +93,13 @@ class RootWrapper(Container):
         self._root_wid_inst._derender_()
 
     def isnested(self):
-        raise TypeError(f"roots cannot be nested (decorated with @RootWidget(...))")
+        raise TypeError(f"roots cannot be nested")
 
     def _std_startup_(self):
-        #self._root_wid_inst = root_wid = cls()
         self._nest_(self._root_wid_inst)
         self._place_((0, 0), self._size)
         self._render_()
 
     # possible future api
-    def change_layoutcls(self, layoutcls):
+    def _proto_change_layoutcls(self, layoutcls):
         raise NotImplementedError()

@@ -1,24 +1,41 @@
+# The MIT License (MIT)
+#
+# Copyright (c) 2021 Jonah Yolles-Murphy (TG-Techie)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
 from .base import *
 
-# TODO: add derived states
 
-class State():
-
+class State:
     def __init__(self, value, repr=repr):
         self._id_ = uid()
         self._value = value
         self._registered = []
         self._repr = repr
 
-    # #@micropython.native
     def __get__(self, owner, ownertype):
         return self._value
 
-    # #@micropython.native
     def __set__(self, owner, value):
         self.update(value)
 
-    # #@micropython.native
     def update(self, value):
         previous = self._value
         if value != previous:
@@ -28,12 +45,10 @@ class State():
     def __repr__(self):
         return f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
 
-    # #@micropython.native
     def getvalue(self, widget, handler):
         self._register_handler(widget, handler)
         return self._value
 
-    # #@micropython.native
     def _alert_registered(self):
         registered = self._registered
         self._registered = []
@@ -41,15 +56,14 @@ class State():
             widget, handler = registered.pop(0)
             handler()
 
-    # #@micropython.native
     def _register_handler(self, widget, handler):
         self._registered.append((widget, handler))
 
     def derived(self, fn):
         return DerivedState(self, fn)
 
-class DerivedState(State):
 
+class DerivedState(State):
     def __init__(self, state, fn):
 
         self._state = state
@@ -64,7 +78,6 @@ class DerivedState(State):
     def __repr__(self):
         return f"<DerivedState:{self._id_} ({self._state})>"
 
-    # #@micropython.native
     def _on_src_update(self):
         value_src = self._state.getvalue(self, self._on_src_update)
         self._value = self._fn(value_src)
@@ -75,8 +88,7 @@ class DerivedState(State):
         raise TypeError(f"you cannot set the state of {self}, tried to set to {value}")
 
 
-class StatefulAttribute():
-
+class StatefulAttribute:
     def __init__(self, initfn, *, private_name=None, _updatefn=None):
         global uid
 
@@ -94,7 +106,9 @@ class StatefulAttribute():
             self._updatefn = fn
             self._privname = f"_stateful_attr_{fn.__name__}"
         else:
-            raise ValueError(f"{self} alreayd has an update function {self._updatefn}, got {fn}")
+            raise ValueError(
+                f"{self} alreayd has an update function {self._updatefn}, got {fn}"
+            )
         return self
 
     def __get__(self, owner, ownertype):
@@ -115,6 +129,7 @@ class StatefulAttribute():
             setattr(owner, self._privname, value)
             if self._updatefn is not None:
                 self._updatefn(owner)
+
 
 def src_to_value(*, src, widget, handler, default):
     if src is None:
