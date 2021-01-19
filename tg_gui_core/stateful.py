@@ -22,6 +22,7 @@
 
 from .base import *
 
+# TODO: convert list to dict
 
 class State:
     def __init__(self, value, repr=repr):
@@ -46,43 +47,57 @@ class State:
         return f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
 
     def getvalue(self, widget, handler):
-        self._register_handler(widget, handler)
+        self._register_handler_(widget, handler)
         return self._value
 
     def _alert_registered(self):
         registered = self._registered
         self._registered = []
         while len(registered):
-            widget, handler = registered.pop(0)
+            _, handler = registered.pop(0)
             handler()
 
-    def _register_handler(self, widget, handler):
-        self._registered.append((widget, handler))
+    def _register_handler_(self, key, handler):
+        self._registered.append((key, handler))
+
+    def _deregister_all_handlers_(self, widget):
+        self._registered = [(key, handler) for key, handler in self._registered if key is not widget]
 
     def derived(self, fn):
         return DerivedState(self, fn)
 
 
 class DerivedState(State):
-    def __init__(self, state, fn):
+    def __init__(self, states, fn):
+        if isinstance(states, State):
+            states = (states,)
+        elif isinstance(states, tuple):
+            pass
+        else:
+            raise ValueError(f"argument states must be a State or tuple of States")
 
-        self._state = state
+        self._states = states
         self._fn = fn
+
         # register and get the new value
-        start_value = fn(state.getvalue(self, self._on_src_update))
+        # start_value = fn(state.getvalue(self, self._on_src_update))
 
         super().__init__(
-            value=start_value,
+            value=self,
         )
 
+        self._on_src_update()
+
     def __repr__(self):
-        return f"<DerivedState:{self._id_} ({self._state})>"
+        return f"<DerivedState:{self._id_} {self._states}>"
 
     def _on_src_update(self):
-        value_src = self._state.getvalue(self, self._on_src_update)
-        self._value = self._fn(value_src)
+        for state in self._states:
+            state._deregister_all_handlers_(self)
 
-        self._alert_registered()
+        handler = self._on_src_update
+        subvals = [state.getvalue(self, handler) for state in self._states]
+        super().update(self._fn(*subvals))
 
     def update(self, value):
         raise TypeError(f"you cannot set the state of {self}, tried to set to {value}")
