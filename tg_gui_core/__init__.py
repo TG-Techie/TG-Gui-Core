@@ -22,6 +22,7 @@
 
 from .base import *
 from .layout import *
+from .pages import *
 from .root_widget import *
 from .stateful import *
-from .method_specifier import *
+from .attribute_specifier import *

@@ -29,48 +29,56 @@ class PositionSpecifier:
         return (self._calc_x_(inst), self._calc_y_(inst))
 
     def _calc_x_(self, inst):
-        raise NotImplementedError("cannot use a raw PositionSpecifier for x")
+        # default to centered
+        ref = self._ref
+        return ref.x + ref.width//2 - inst.width//2
 
     def _calc_y_(self, inst):
-        raise NotImplementedError("cannot use a raw PositionSpecifier for y")
+        # default to centered
+        return ref.y + ref.height//2 - inst.height//2
 
+class centerto(PositionSpecifier):
+    pass
 
 class leftof(PositionSpecifier):
+
     def _calc_x_(self, inst):
         return self._ref.x - inst.width
 
-    def _calc_y_(self, inst):
-        return self._ref.y
-
-
 class rightof(PositionSpecifier):
+
     def _calc_x_(self, inst):
-        ref = self._ref
-        return ref.x + ref.width
-
-    def _calc_y_(self, inst):
-        return self._ref.y
-
+        return self._ref.x + self._ref.width
 
 class below(PositionSpecifier):
-    def _calc_x_(self, inst):
-        return self._ref.x
 
     def _calc_y_(self, inst):
-        ref = self._ref
-        return ref.y + ref.height
-
+        return self._ref.y + self._ref.height
 
 class above(PositionSpecifier):
+
+    def _calc_y_(self, inst):
+        return self._ref.y - inst.height
+
+class XSpecifier(PositionSpecifier):
+
     def _calc_x_(self, inst):
         return self._ref.x
 
     def _calc_y_(self, inst):
-        ref = self._ref
-        return ref.y - inst.height
+        raise ValueError(f"XSpecifiers cannot be used for y coordinates")
 
 
-class _Center(PositionSpecifier):
+class YSpecifier(PositionSpecifier):
+
+    def _calc_x_(self, inst):
+        raise ValueError(f"YSpecifiers cannot be used for y coordinates")
+
+    def _calc_y_(self, inst):
+        return self._ref.y
+
+
+class _SuperiorCenter(PositionSpecifier):
     def __init__(self):
         pass
 
@@ -106,15 +114,10 @@ class ConstantPosition(PositionSpecifier):
         return self._y
 
 
-center = _Center()
+center = _SuperiorCenter()
 
 top = ConstantPosition(None, 0, name="top")
 bottom = ConstantPosition(None, -1, name="bottom")
 
 left = ConstantPosition(0, None, name="left")
 right = ConstantPosition(-1, None, name="right")
-
-top_left = (left, top)
-top_right = (right, top)
-bottom_left = (left, bottom)
-bottom_right = (right, bottom)

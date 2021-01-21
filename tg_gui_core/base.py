@@ -1,29 +1,9 @@
-# The MIT License (MIT)
-#
-# Copyright (c) 2021 Jonah Yolles-Murphy (TG-Techie)
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-
 import sys
 
 sys_impl_name_ = sys.implementation.name
 on_circuitpython_ = sys_impl_name_ in ("circuitpython", "micropython")
+
+# TODO: make widgets return DimSpecs and PosSpecs when dims and coords are not set yet
 
 import random as _random
 
@@ -140,6 +120,10 @@ class Screen:
         self.min_size = min_size
         self.palettes = palettes
 
+        self._pointables_ = []
+        self._pressables_ = []
+        self._altpressables_ = []
+
     def __repr__(self):
         return f"<{type(self).__name__} {self._id_}>"
 
@@ -168,6 +152,12 @@ class Screen:
     def on_container_pickup(self, wid: "Widget"):
         pass
 
+    def on_container_render(_, widget: "Widget"):
+        pass
+
+    def on_container_derender(_, widget: "Widget"):
+        pass
+
 
 class Widget:
 
@@ -190,7 +180,8 @@ class Widget:
 
         self._rendered_ = False
 
-        self._hinted_superior = superior
+        if superior is not None:
+            superior._nest_(self)
 
     def __repr__(self):
         return f"<{type(self).__name__} {self._id_}>"
@@ -199,7 +190,10 @@ class Widget:
         return self._superior_ is not None
 
     def isnestedin(self, maybe_superior):
-        return self._superior_ is maybe_superior and self in maybe_superior._nested_
+        return (
+            self._superior_ is maybe_superior
+            and self in maybe_superior._nested_
+        )
 
     def isplaced(self):
         return self._placement_ is not None  # and self.isnested()
@@ -218,7 +212,8 @@ class Widget:
             pass
         else:
             raise ValueError(
-                f"{self} already nested in {current}, " + f"cannot nest in {superior}"
+                f"{self} already nested in {current}, "
+                + f"cannot nest in {superior}"
             )
 
         self._on_nest_()
@@ -230,7 +225,7 @@ class Widget:
     # list, zstacks, and others will need to manually nest in their __init__s
     def __get__(self, owner, ownertype):
         # this adds a side effect to getters
-        # print('__get__', self, owner, f"self.isnested()={self.isnested()}")
+        # if __debug__: print('__get__', self, owner, f"self.isnested()={self.isnested()}")
         if not self.isnested():
             owner._nest_(self)
         return self
@@ -241,8 +236,6 @@ class Widget:
         return self
 
     def _place_(self, coord, dims):
-        if self._hinted_superior is not None:
-            self._hinted_superior._nest_(self)
         # is there a diference between place and render? (yes, button state)
         assert self.isnested(), f"{self} must be nested to place it"
         # print(self)
@@ -266,7 +259,6 @@ class Widget:
 
         # make sure PositionSpecifiers have access to width/height
         self._placement_ = (None, None, width, height)
-        # print(self, self.width)
 
         # format coord
         if isinstance(coord, PositionSpecifier):
@@ -282,7 +274,9 @@ class Widget:
             y = y._calc_y_(self)
 
         if self._superior_ is None and (x < 0 or y < 0):
-            raise ValueError(f"right aligned coord cannot be used with root widgets")
+            raise ValueError(
+                f"right aligned coord cannot be used with root widgets"
+            )
 
         # adjust
         if x < 0:
@@ -323,7 +317,10 @@ class Widget:
 
     def _render_(self):
         self._rendered_ = True
-        self._screen_.on_widget_render(self)
+        screen = self._screen_
+        screen.on_widget_render(self)
+        if hasattr(self, "_selected_"):
+            screen._pointables_.append(self)
 
     def _derender_(self):
         self._screen_.on_widget_derender(self)
@@ -342,6 +339,7 @@ class Widget:
         self._rel_placement_ = None
         self._phys_coord = None
 
+    # #@micropython.native
     def _has_phys_coord_in_(self, coord):
         # print(f"self._phys_coord_={self._phys_coord_}, coord={coord}, self._phys_end_coord={self._phys_end_coord}")
         minx, miny = self._phys_coord_
@@ -398,51 +396,42 @@ class Container(Widget):
         raise NotImplementedError("dev side not implemented")
 
     def _place_(self, coord, dims):
-        raise NotImplementedError(f"{type(self).__name__}._place_ not implemented")
-        # suggested code:
-        """
-        Widget._place_(self, coord, dims)
-        `nested widget placement code`
+        super()._place_(coord, dims)
+        self._place_nested_()
         self._screen_.on_container_place(self)
-        """
 
-    def _pickup_(self):
-        raise NotImplementedError(f"{type(self).__name__}._pickup_ not implemented")
-        # suggested code:
-        """
+    def _pickup_(self, visual):
         self._screen_.on_container_pickup(self)
-        `nested widget pickup code`
-        Widget._pickup_(self)
-        """
+        self._pickup_nested_()
+        super()._pickup_(visual)
 
     def _render_(self):
-        raise NotImplementedError(f"{type(self).__name__}._render_ not implemented")
-        # suggested code:
-        """
         super()._render_()
         self._render_nested_()
-        """
 
     def _derender_(self):
-        raise NotImplementedError(f"{type(self).__name__}._derender_ not implemented")
-        # suggested code:
-        """
         super()._derender_()
         self._derender_nested_()
-        """
 
-    #
-    # def _render_nested_(self):
-    #     raise NotImplementedError(f"{type(self).__name__}._render_nested_ not implemented")
-    #
-    # def _derender_nested_(self):
-    #     raise NotImplementedError(f"{type(self).__name__}._derender_nested_ not implemented")
-    #
-    # def _place_nested_(self):
-    #     raise NotImplementedError(f"{type(self).__name__}._place_nested_ not implemented")
-    #
-    # def _pickup_nested_(self):
-    #     raise NotImplementedError(f"{type(self).__name__}._pickup_nested_ not implemented")
+    def _render_nested_(self):
+        raise NotImplementedError(
+            f"{type(self).__name__}._render_nested_ not implemented"
+        )
+
+    def _derender_nested_(self):
+        raise NotImplementedError(
+            f"{type(self).__name__}._derender_nested_ not implemented"
+        )
+
+    def _place_nested_(self):
+        raise NotImplementedError(
+            f"{type(self).__name__}._place_nested_ not implemented"
+        )
+
+    def _pickup_nested_(self):
+        raise NotImplementedError(
+            f"{type(self).__name__}._pickup_nested_ not implemented"
+        )
 
     def __del__(self):
         super().__del__()

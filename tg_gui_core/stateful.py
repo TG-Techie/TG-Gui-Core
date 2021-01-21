@@ -24,17 +24,20 @@ from .base import *
 
 # TODO: convert list to dict
 
+
 class State:
     def __init__(self, value, repr=repr):
         self._id_ = uid()
         self._value = value
-        self._registered = []
+        self._registered = {}
         self._repr = repr
 
     def __get__(self, owner, ownertype):
+        # print(self, 'get', owner)
         return self._value
 
     def __set__(self, owner, value):
+        # print(self, 'set', owner, repr(value), '|'+value+'|')
         self.update(value)
 
     def update(self, value):
@@ -44,7 +47,9 @@ class State:
             self._alert_registered()
 
     def __repr__(self):
-        return f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
+        return (
+            f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
+        )
 
     def getvalue(self, widget, handler):
         self._register_handler_(widget, handler)
@@ -52,19 +57,21 @@ class State:
 
     def _alert_registered(self):
         registered = self._registered
-        self._registered = []
-        while len(registered):
-            _, handler = registered.pop(0)
-            handler()
+        self._registered = {}
+        for handlers in registered.values():
+            for handler in handlers:
+                handler()
 
     def _register_handler_(self, key, handler):
-        self._registered.append((key, handler))
+        if key not in self._registered:
+            self._registered[key] = [handler]
+        else:
+            self._registered[key].append(handler)
 
-    def _deregister_all_handlers_(self, widget):
-        self._registered = [(key, handler) for key, handler in self._registered if key is not widget]
-
-    def derived(self, fn):
-        return DerivedState(self, fn)
+    def _deregister_all_handlers_(self, key):
+        registered = self._registered
+        if key in registered:
+            registered.pop(key)
 
 
 class DerivedState(State):
@@ -74,7 +81,9 @@ class DerivedState(State):
         elif isinstance(states, tuple):
             pass
         else:
-            raise ValueError(f"argument states must be a State or tuple of States")
+            raise ValueError(
+                f"argument states must be a State or tuple of States"
+            )
 
         self._states = states
         self._fn = fn
@@ -97,10 +106,18 @@ class DerivedState(State):
 
         handler = self._on_src_update
         subvals = [state.getvalue(self, handler) for state in self._states]
-        super().update(self._fn(*subvals))
+        # fn inline
+        # super().update(self._fn(*subvals))
+        value = self._fn(*subvals)
+        previous = self._value
+        if value != previous:
+            self._value = value
+            self._alert_registered()
 
     def update(self, value):
-        raise TypeError(f"you cannot set the state of {self}, tried to set to {value}")
+        raise TypeError(
+            f"you cannot set the state of {self}, tried to set to {value}"
+        )
 
 
 class StatefulAttribute:

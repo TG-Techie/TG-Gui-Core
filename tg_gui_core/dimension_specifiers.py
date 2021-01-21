@@ -29,17 +29,18 @@ class DimensionSpecifier:
 
 
 class _calc_Based(DimensionSpecifier):
-    def __init__(self):
+    def __init__(self, _for_superior=False):
+        self._for_superior = _for_superior
         self._ops = []
 
-    def _base_dim(self):
+    def _base_dim(self, inst):
         raise NotImplementedError()
 
-    def _calc_dim_(self):
-        dim = self._base_dim()
+    def _calc_dim_(self, inst):
+        dim = self._base_dim(inst)
         for op, val in self._ops:
             if isinstance(val, DimensionSpecifier):
-                val = val._calc_dim_()
+                val = val._calc_dim_(inst)
             if op == "+":
                 dim += val
             elif op == "-":
@@ -49,23 +50,67 @@ class _calc_Based(DimensionSpecifier):
             elif op == "//":
                 dim //= val
             else:
-                raise ValueError(f"{repr(op)} not supported for dimension specifiers")
+                raise NotImplementedError(
+                    f"{repr(op)} not supported for dimension specifiers"
+                )
+        return dim
 
     def __add__(self, value):
         self._ops.append(("+", value))
+        return self
 
     def __sub__(self, value):
         self._ops.append(("-", value))
+        return self
+
+    def __rsub__(self, value):
+        self._ops.append(("r-", value))
+        return self
 
     def __mul__(self, value):
         self._ops.append(("*", value))
+        return self
+
+    def __rmul__(self, value):
+        self._ops.append(("*", value))
+        return self
 
     def __floordiv__(self, value):
         self._ops.append(("//", value))
+        return self
 
 
-def _Infer(DimensionSpecifier):
-    pass
+class WidthForwardSpecifier(_calc_Based):
+    def _base_dim(self, inst):
+        if self._for_superior:
+            return inst._superior_.width
+        else:
+            return inst.width
 
 
-# infer = _Infer()
+class HeightForwardSpecifier(_calc_Based):
+    def _base_dim(self, inst):
+        if self._for_superior:
+            return inst._superior_.height
+        else:
+            return inst.height
+
+
+# WidthSpecifier
+class width(_calc_Based):
+    def __init__(self, ref):
+        super().__init__()
+        self._ref = ref
+
+    def _base_dim(self, inst):
+        return self._ref.width
+
+
+# HeightSpecifier
+class height(_calc_Based):
+    def __init__(self, ref):
+        super().__init__()
+        self._ref = ref
+
+    def _base_dim(self, inst):
+        return self._ref.height

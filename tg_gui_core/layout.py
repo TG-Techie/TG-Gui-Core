@@ -30,12 +30,14 @@ class Layout(Container):
         for wid in self._nested_:
             if wid.isplaced():
                 wid._render_()
+        self._screen_.on_container_render(self)
 
     def _derender_(self):
         for wid in self._nested_:
             if wid.isplaced():
                 wid._derender_()
         Widget._derender_(self)
+        self._screen_.on_container_derender(self)
 
     def _place_(self, coord, dims):
         Widget._place_(self, coord, dims)
@@ -47,7 +49,9 @@ class Layout(Container):
         elif isinstance(layoutcls, LayoutCls.mobile):
             self._mobile_(layoutcls.width, layoutcls.height)
         else:
-            raise ValueError(f"unknown LayoutCls variant or object, {type(layoutcls)}")
+            raise ValueError(
+                f"unknown LayoutCls variant or object, {type(layoutcls)}"
+            )
 
         self._screen_.on_container_place(self)
 

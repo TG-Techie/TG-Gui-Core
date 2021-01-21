@@ -20,28 +20,57 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+from . import dimension_specifiers
+from . import position_specifiers
+
 _singleton = lambda cls: cls()
 
 
-@_singleton
-class self:
+class SpecifierConstructor:
+    def __init__(self, *, name, for_superior):
+        self._for_superior = for_superior
+        self._name = name
+
     def __repr__(self):
-        return "<MethodSpecifier constructor 'self'>"
+        return f"<Specifier constructor {repr(self._name)}>"
+
+    @property
+    def width(self):
+        global dimension_specifiers
+        return dimension_specifiers.WidthForwardSpecifier(
+            _for_superior=self._for_superior
+        )
+
+    @property
+    def height(self):
+        global dimension_specifiers
+        return dimension_specifiers.HeightForwardSpecifier(
+            _for_superior=self._for_superior
+        )
 
     def __getattr__(self, name):
-        global MethodSpecifier
-        return MethodSpecifier(name)
+        global AttributeSpecifier
+        return AttributeSpecifier(name, _for_superior=self._for_superior)
 
 
-class MethodSpecifier:
-    def __init__(self, name):
+self = SpecifierConstructor(name="self", for_superior=False)
+superior = SpecifierConstructor(name="superior", for_superior=True)
+
+
+class AttributeSpecifier:
+    def __init__(self, name, _for_superior=False):
+        self._for_superior = _for_superior
         self._name = name
         self._method = None
 
-    def getmethod(self, widget):
+    def get_attribute(self, widget):
         method = self._method
         if self._method is not None:
             return method
         else:
-            self._method = method = getattr(widget._superior_, self._name)
+            if self._for_superior:  # for the continer's superior
+                widgetfrom = widget._superior_._superior_
+            else:  # for the container
+                widgetfrom = widget._superior_
+            self._method = method = getattr(widgetfrom, self._name)
             return method
