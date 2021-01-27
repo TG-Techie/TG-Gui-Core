@@ -12,15 +12,41 @@ from .position_specifiers import *
 from .dimension_specifiers import *
 
 
-class PlacementError(Exception):
+class NestingError(RuntimeError):
     pass
 
 
-class RenderError(Exception):
+class PlacementError(RuntimeError):
+    pass
+
+
+class RenderError(RuntimeError):
     pass
 
 
 _next_id = _random.randint(0, 11)
+
+
+class Constant:
+    def __init__(self, outer, name):
+        self._name = name
+        self._outer = outer
+
+    def __repr__(self):
+        return f"<Constant {self._outer._name}.{self._name}>"
+
+
+class ConstantGroup:
+    def __init__(self, name, subs):
+        self._name = name
+        self._subs = subs_dict = {
+            sub_name: Constant(self, sub_name) for sub_name in subs
+        }
+        for name, sub in subs_dict.items():
+            setattr(self, name, sub)
+
+    def __repr__(self):
+        return f"<ConstantGroup {self._name}>"
 
 
 def uid():
@@ -34,10 +60,7 @@ def clip(lower, value, upper):
     return min(max(lower, value), upper)
 
 
-class align:  # for text alignment
-    leading = uid()
-    center = uid()
-    trailing = uid()
+align = ConstantGroup("align", ("leading", "center", "trailing"))
 
 
 class color:
@@ -140,6 +163,9 @@ class Screen:
     def on_widget_nest_in(self, wid: "Widget"):
         pass
 
+    def on_widget_unnest_from(self, wid: "Widget"):
+        pass
+
     def on_widget_render(self, wid: "Widget"):
         pass
 
@@ -190,10 +216,7 @@ class Widget:
         return self._superior_ is not None
 
     def isnestedin(self, maybe_superior):
-        return (
-            self._superior_ is maybe_superior
-            and self in maybe_superior._nested_
-        )
+        return self._superior_ is maybe_superior and self in maybe_superior._nested_
 
     def isplaced(self):
         return self._placement_ is not None  # and self.isnested()
@@ -208,22 +231,39 @@ class Widget:
             self._superior_ = superior
             self._screen_ = superior._screen_
             self._screen_.on_widget_nest_in(self)
-        elif current is superior:
-            pass
+        elif current is superior:  # if double nesting in same thing
+            print(
+                f"WARNING: {self} already nested in {current}, "
+                + "double nesting in the same widget is not advisable"
+            )
         else:
             raise ValueError(
-                f"{self} already nested in {current}, "
-                + f"cannot nest in {superior}"
+                f"{self} already nested in {current}, " + f"cannot nest in {superior}"
             )
 
         self._on_nest_()
 
+    def _unnest_from_(self, superior):
+        if self._superior_ is superior:
+            self._screen_.on_widget_unnest_from(self)
+            self._screen_ = None
+            self._superior_ = None
+        else:
+            raise RuntimeError(
+                f"cannot unnest {self} from {superior}, nested in {self._superior_}"
+            )
+
     def _on_nest_(self):
+        pass
+
+    def _on_unnest_(self):
         pass
 
     # auto nesting, only for layouts, etc
     # list, zstacks, and others will need to manually nest in their __init__s
-    def __get__(self, owner, ownertype):
+    def __get__(self, owner, ownertype=None):
+        #  def __get__(self, owner=None, ownertype=None):
+        # print(f"self={self}, owner={owner}, ownertype={ownertype}")
         # this adds a side effect to getters
         # if __debug__: print('__get__', self, owner, f"self.isnested()={self.isnested()}")
         if not self.isnested():
@@ -274,9 +314,7 @@ class Widget:
             y = y._calc_y_(self)
 
         if self._superior_ is None and (x < 0 or y < 0):
-            raise ValueError(
-                f"right aligned coord cannot be used with root widgets"
-            )
+            raise ValueError(f"right aligned coord cannot be used with root widgets")
 
         # adjust
         if x < 0:
@@ -339,14 +377,6 @@ class Widget:
         self._rel_placement_ = None
         self._phys_coord = None
 
-    # #@micropython.native
-    def _has_phys_coord_in_(self, coord):
-        # print(f"self._phys_coord_={self._phys_coord_}, coord={coord}, self._phys_end_coord={self._phys_end_coord}")
-        minx, miny = self._phys_coord_
-        x, y = coord
-        maxx, maxy = self._phys_end_coord
-        return (minx <= x <= maxx) and (miny <= y <= maxy)
-
     # coordinates and dimension getters
     coord = property(lambda self: self._placement_[0:2])
     _rel_coord_ = property(lambda self: self._rel_placement_[0:2])
@@ -387,13 +417,16 @@ class Container(Widget):
     def _setup_(self):
         pass  # used for setting up of reuables contianers "compound widgets"
 
-    def _nest_(self, wid: Widget):
-        if wid not in self._nested_:
-            self._nested_.append(wid)
-            wid._nest_in_(self)
+    def _nest_(self, widget: Widget):
+        if widget not in self._nested_:
+            self._nested_.append(widget)
+            widget._nest_in_(self)
 
-    def _unnest_(self, wid: Widget):
-        raise NotImplementedError("dev side not implemented")
+    def _unnest_(self, widget: Widget):
+        # raise NotImplementedError("dev side not implemented")
+        while widget in self._nested_:
+            widget._unnest_from_(self)
+            self._nested_.remove(widget)
 
     def _place_(self, coord, dims):
         super()._place_(coord, dims)

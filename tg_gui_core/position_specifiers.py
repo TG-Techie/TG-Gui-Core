@@ -30,38 +30,44 @@ class PositionSpecifier:
 
     def _calc_x_(self, inst):
         # default to centered
-        ref = self._ref
-        return ref.x + ref.width//2 - inst.width//2
+        return self._ref.x + self._ref.width // 2 - inst.width // 2
 
     def _calc_y_(self, inst):
         # default to centered
-        return ref.y + ref.height//2 - inst.height//2
+        return self._ref.y + self._ref.height // 2 - inst.height // 2
+
 
 class centerto(PositionSpecifier):
-    pass
+    def _calc_x_(self, inst):
+        # default to centered
+        return self._ref.x + self._ref.width // 2 - inst.width // 2
+
+    def _calc_y_(self, inst):
+        # default to centered
+        return self._ref.y + self._ref.height // 2 - inst.height // 2
+
 
 class leftof(PositionSpecifier):
-
     def _calc_x_(self, inst):
         return self._ref.x - inst.width
 
-class rightof(PositionSpecifier):
 
+class rightof(PositionSpecifier):
     def _calc_x_(self, inst):
         return self._ref.x + self._ref.width
 
-class below(PositionSpecifier):
 
+class below(PositionSpecifier):
     def _calc_y_(self, inst):
         return self._ref.y + self._ref.height
 
-class above(PositionSpecifier):
 
+class above(PositionSpecifier):
     def _calc_y_(self, inst):
         return self._ref.y - inst.height
 
-class XSpecifier(PositionSpecifier):
 
+class XSpecifier(PositionSpecifier):
     def _calc_x_(self, inst):
         return self._ref.x
 
@@ -70,7 +76,6 @@ class XSpecifier(PositionSpecifier):
 
 
 class YSpecifier(PositionSpecifier):
-
     def _calc_x_(self, inst):
         raise ValueError(f"YSpecifiers cannot be used for y coordinates")
 

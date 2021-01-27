@@ -68,7 +68,7 @@ class State:
         else:
             self._registered[key].append(handler)
 
-    def _deregister_all_handlers_(self, key):
+    def _deregister_handlers_(self, key):
         registered = self._registered
         if key in registered:
             registered.pop(key)
@@ -102,7 +102,7 @@ class DerivedState(State):
 
     def _on_src_update(self):
         for state in self._states:
-            state._deregister_all_handlers_(self)
+            state._deregister_handlers_(self)
 
         handler = self._on_src_update
         subvals = [state.getvalue(self, handler) for state in self._states]

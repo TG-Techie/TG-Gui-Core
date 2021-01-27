@@ -45,9 +45,15 @@ class Layout(Container):
         layoutcls = self._screen_.layout_class
 
         if layoutcls is LayoutCls.wearable:
-            self._wearable_()
+            if hasattr(self, "_wearable_"):
+                self._wearable_()
+            else:
+                self._any_()
         elif isinstance(layoutcls, LayoutCls.mobile):
-            self._mobile_(layoutcls.width, layoutcls.height)
+            if hasattr(self, "_mobile_"):
+                self._mobile_(layoutcls.width, layoutcls.height)
+            else:
+                self._any_()
         else:
             raise ValueError(
                 f"unknown LayoutCls variant or object, {type(layoutcls)}"
@@ -70,8 +76,8 @@ class Layout(Container):
             f"layout methods must be written for subclasses of layout"
         )
 
-    def _wearable_(self):
-        self._any_()
-
-    def _mobile_(self, width: SizeClass, height: SizeClass):
-        self._any_()
+    # def _wearable_(self):
+    #     self._any_()
+    #
+    # def _mobile_(self, width: SizeClass, height: SizeClass):
+    #     self._any_()

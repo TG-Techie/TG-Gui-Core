@@ -97,8 +97,11 @@ class RootWrapper(Container):
 
     def _std_startup_(self):
         self._nest_(self._root_wid_inst)
+        gc.collect()
         self._place_((0, 0), self._size)
+        gc.collect()
         self._render_()
+        gc.collect()
 
     # possible future api
     def _proto_change_layoutcls(self, layoutcls):
