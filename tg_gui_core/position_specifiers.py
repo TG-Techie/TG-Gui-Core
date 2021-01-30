@@ -67,35 +67,8 @@ class above(PositionSpecifier):
         return self._ref.y - inst.height
 
 
-class XSpecifier(PositionSpecifier):
-    def _calc_x_(self, inst):
-        return self._ref.x
-
-    def _calc_y_(self, inst):
-        raise ValueError(f"XSpecifiers cannot be used for y coordinates")
-
-
-class YSpecifier(PositionSpecifier):
-    def _calc_x_(self, inst):
-        raise ValueError(f"YSpecifiers cannot be used for y coordinates")
-
-    def _calc_y_(self, inst):
-        return self._ref.y
-
-
-class _SuperiorCenter(PositionSpecifier):
-    def __init__(self):
-        pass
-
-    def _calc_x_(self, inst):
-        return inst._superior_.width // 2 - inst.width // 2
-
-    def _calc_y_(self, inst):
-        return inst._superior_.height // 2 - inst.height // 2
-
-
 class ConstantPosition(PositionSpecifier):
-    def __init__(self, x, y, *, name=None):
+    def __init__(self, *, x=None, y=None, name=None):
         self._name = name
         self._x = x
         self._y = y
@@ -110,19 +83,19 @@ class ConstantPosition(PositionSpecifier):
 
     def _calc_x_(self, inst):
         if self._x is None:
-            raise ValueError(f"{self} cannot be used to specify x coordinates")
+            return inst._superior_.width // 2 - inst.width // 2
         return self._x
 
     def _calc_y_(self, inst):
         if self._y is None:
-            raise ValueError(f"{self} cannot be used to specify y coordinates")
+            return inst._superior_.height // 2 - inst.height // 2
         return self._y
 
 
-center = _SuperiorCenter()
+center = ConstantPosition(name="center")
 
-top = ConstantPosition(None, 0, name="top")
-bottom = ConstantPosition(None, -1, name="bottom")
+top = ConstantPosition(y=0, name="top")
+bottom = ConstantPosition(y=-1, name="bottom")
 
-left = ConstantPosition(0, None, name="left")
-right = ConstantPosition(-1, None, name="right")
+left = ConstantPosition(x=0, name="left")
+right = ConstantPosition(x=-1, name="right")

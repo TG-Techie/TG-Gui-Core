@@ -102,9 +102,9 @@ class color:
     black = 0x000000
 
     def fromfloats(r, g, b):
-        r = round(255 * r**1.618)
-        g = round(255 * g**1.618)
-        b = round(255 * b**1.618)
+        r = round(255 * r ** 1.2)
+        g = round(255 * g ** 1.2)
+        b = round(255 * b ** 1.2)
         return (r << 16) | (g << 8) | (b << 0)
 
 
