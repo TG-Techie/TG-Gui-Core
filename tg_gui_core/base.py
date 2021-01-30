@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+
 import random as _random
 
 from .layout_classes import *
@@ -99,6 +100,12 @@ class color:
     gray = 0x909090
     darkgray = 0x606060
     black = 0x000000
+
+    def fromfloats(r, g, b):
+        r = round(255 * r**1.618)
+        g = round(255 * g**1.618)
+        b = round(255 * b**1.618)
+        return (r << 16) | (g << 8) | (b << 0)
 
 
 class Palette:
@@ -291,6 +298,18 @@ class Widget:
 
     def _on_unnest_(self):
         pass
+
+    # auto nesting, only for layouts, etc
+    # list, zstacks, and others will need to manually nest in their __init__s
+    def __get__(self, owner, ownertype=None):
+        if not self.isnested():
+            owner._nest_(self)
+        return self
+
+    # placement sugar, still in flux
+    def __call__(self, coord, dims):
+        self._place_(coord, dims)
+        return self
 
     def _place_(self, coord, dims):
         assert self.isnested(), f"{self} must be nested to place it, it's not"
