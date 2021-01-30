@@ -33,11 +33,15 @@ class State:
         self._repr = repr
 
     def __get__(self, owner, ownertype):
-        # print(self, 'get', owner)
+        """
+        Used for using states as values in functions, great for button actions.
+        """
         return self._value
 
     def __set__(self, owner, value):
-        # print(self, 'set', owner, repr(value), '|'+value+'|')
+        """
+        Used for using states as values in functions, great for button actions.
+        """
         self.update(value)
 
     def update(self, value):
@@ -47,9 +51,7 @@ class State:
             self._alert_registered()
 
     def __repr__(self):
-        return (
-            f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
-        )
+        return f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
 
     def getvalue(self, widget, handler):
         self._register_handler_(widget, handler)
@@ -81,9 +83,7 @@ class DerivedState(State):
         elif isinstance(states, tuple):
             pass
         else:
-            raise ValueError(
-                f"argument states must be a State or tuple of States"
-            )
+            raise ValueError(f"argument states must be a State or tuple of States")
 
         self._states = states
         self._fn = fn
@@ -115,9 +115,7 @@ class DerivedState(State):
             self._alert_registered()
 
     def update(self, value):
-        raise TypeError(
-            f"you cannot set the state of {self}, tried to set to {value}"
-        )
+        raise TypeError(f"you cannot set the state of {self}, tried to set to {value}")
 
 
 class StatefulAttribute:
@@ -171,3 +169,8 @@ def src_to_value(*, src, widget, handler, default):
     else:
         val = src
     return val
+
+
+def unlink_from_src(*, src, widget):
+    if isinstance(src, State):
+        src._deregister_handlers_(widget)

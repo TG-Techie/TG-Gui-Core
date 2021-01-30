@@ -1,16 +1,33 @@
-import sys
-import math
+# The MIT License (MIT)
+#
+# Copyright (c) 2021 Jonah Yolles-Murphy (TG-Techie)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
-sys_impl_name_ = sys.implementation.name
-on_circuitpython_ = sys_impl_name_ in ("circuitpython", "micropython")
-
-# TODO: make widgets return DimSpecs and PosSpecs when dims and coords are not set yet
 
 import random as _random
 
 from .layout_classes import *
 from .position_specifiers import *
 from .dimension_specifiers import *
+
+# TODO: make widgets return DimSpecs and PosSpecs when dims and coords are not set yet
 
 
 class NestingError(RuntimeError):
@@ -26,6 +43,21 @@ class RenderError(RuntimeError):
 
 
 _next_id = _random.randint(0, 11)
+
+
+def uid():
+    global _next_id
+    id = _next_id
+    _next_id += 1
+    return id
+
+
+def clip(lower, value, upper):
+    return min(max(lower, value), upper)
+
+
+def singleinstance(cls):
+    return cls()
 
 
 class Constant:
@@ -48,17 +80,6 @@ class ConstantGroup:
 
     def __repr__(self):
         return f"<ConstantGroup {self._name}>"
-
-
-def uid():
-    global _next_id
-    id = _next_id
-    _next_id += 1
-    return id
-
-
-def clip(lower, value, upper):
-    return min(max(lower, value), upper)
 
 
 align = ConstantGroup("align", ("leading", "center", "trailing"))
@@ -158,8 +179,6 @@ class Screen:
         return f"<{type(self).__name__} {self._id_}>"
 
     def __getattr__(self, name):
-        # if name in self._kwargs:
-        # return self._kwargs[name]
         if self.outer is not None:
             try:
                 return getattr(self.outer, name)
@@ -167,6 +186,7 @@ class Screen:
                 pass
         raise AttributeError(f"unable to get attribute `.{name}`")
 
+    # platform tie-in functions
     def on_widget_nest_in(self, wid: "Widget"):
         pass
 
@@ -196,9 +216,7 @@ class Widget:
 
     _next_id = 0
 
-    def __init__(
-        self, *, superior=None, margin=None
-    ):  # TODO: should use nest or superior kwarg?
+    def __init__(self, *, margin=None):  # TODO: should use nest or superior kwarg?
         global Widget
         self._id_ = uid()
 
@@ -213,17 +231,11 @@ class Widget:
 
         self._rendered_ = False
 
-        if superior is not None:
-            superior._nest_(self)
-
     def __repr__(self):
         return f"<{type(self).__name__} {self._id_}>"
 
     def isnested(self):
         return self._superior_ is not None
-
-    def isnestedin(self, maybe_superior):
-        return self._superior_ is maybe_superior and self in maybe_superior._nested_
 
     def isplaced(self):
         return self._placement_ is not None  # and self.isnested()
@@ -231,10 +243,26 @@ class Widget:
     def isrendered(self):
         return self._rendered_
 
+    def __get__(self, owner, ownertype=None):
+        """
+        Widgets act as their own descriptors, this allows them to auto nest into layouts.
+        """
+        if not self.isnested():
+            owner._nest_(self)
+        return self
+
+    def __call__(self, *args):
+        self._place_(*args)
+        return self
+
     def _nest_in_(self, superior):
-        # nesting is permanent, this shoudl bbe called by the parent
+        """
+        Called by the superior of a widget (self) to link the widget as it's subordinate.
+        """
+        # nesting is permanent, this should be called by the parent widget once
         current = self._superior_
         if current is None:
+
             self._superior_ = superior
             self._screen_ = superior._screen_
             self._screen_.on_widget_nest_in(self)
@@ -251,8 +279,13 @@ class Widget:
         self._on_nest_()
 
     def _unnest_from_(self, superior):
+        """
+        Called by superiors to un-link the (now-ex) subordinate from the superior
+        """
         if self._superior_ is superior:
+            # platform tie-in
             self._screen_.on_widget_unnest_from(self)
+            # clear out data
             self._screen_ = None
             self._superior_ = None
         else:
@@ -279,10 +312,7 @@ class Widget:
         return self
 
     def _place_(self, coord, dims):
-        # is there a diference between place and render? (yes, button state)
-        assert self.isnested(), f"{self} must be nested to place it"
-        # print(self)
-        # assert not self.isplaced(), f"cannot doulbe place {self}, it must be pickup-ed first"
+        assert self.isnested(), f"{self} must be nested to place it, it's not"
 
         was_on_screen = self.isrendered()
         if was_on_screen:  # if was_on_screen := self.isrendered()
@@ -310,10 +340,8 @@ class Widget:
             x, y = coord
 
         if isinstance(x, PositionSpecifier):
-            # print('x is posspec')
             x = x._calc_x_(self)
         if isinstance(y, PositionSpecifier):
-            # print('y is posspec')
             y = y._calc_y_(self)
 
         if self._superior_ is None and (x < 0 or y < 0):
@@ -346,30 +374,23 @@ class Widget:
             self._render_()
 
     def _pickup_(self):
+        assert not self.isrendered()
+        assert self.isplaced()
         # only containers need to worry about when to cover vs replace
         self._placement_ = None
         self._rel_placement_ = None
         self._phys_coord_ = None
-        if self.isrendered():
-            # if it is on the screen biut is being pickup up it shoudl derender
-            #   visually, generally everything should be derendered before it
-            #   is pickedup
-            self._derender_(True)
 
     def _render_(self):
+        assert self.isplaced()
         self._rendered_ = True
         screen = self._screen_
-        screen.on_widget_render(self)
-        if hasattr(self, "_selected_"):
-            screen._pointables_.append(self)
+        screen.on_widget_render(self)  # platform tie-in
 
     def _derender_(self):
-        self._screen_.on_widget_derender(self)
+        assert self.isrendered()
+        self._screen_.on_widget_derender(self)  # platform tie-in
         self._rendered_ = False
-
-    def _rerender_(self):
-        self._derender_()
-        self._rerender_()
 
     def __del__(self):
         # remove double links
@@ -383,7 +404,7 @@ class Widget:
     # coordinates and dimension getters
     coord = property(lambda self: self._placement_[0:2])
     _rel_coord_ = property(lambda self: self._rel_placement_[0:2])
-    # uses raw exposed tuple # _phys_coord_ = property(lambda self: self._phys_coord)
+    #!!  _phys_coord_ uses raw exposed tuple for
 
     dims = property(lambda self: self._placement_[2:4])
     _phys_dims_ = property(lambda self: self._rel_placement_[2:4])
@@ -404,10 +425,10 @@ class Widget:
 
 
 class Container(Widget):
-    def __init__(self, superior=None):
+    def __init__(self):
         global Widget
 
-        super().__init__(superior=superior, margin=0)
+        super().__init__(margin=0)
 
         self._nested_ = []
 
@@ -418,7 +439,7 @@ class Container(Widget):
         return ((0, 0), self.dims)
 
     def _setup_(self):
-        pass  # used for setting up of reuables contianers "compound widgets"
+        pass  # used for setting up of reuables contianers, "compound widgets"
 
     def _nest_(self, widget: Widget):
         if widget not in self._nested_:
@@ -426,9 +447,9 @@ class Container(Widget):
             widget._nest_in_(self)
 
     def _unnest_(self, widget: Widget):
-        # raise NotImplementedError("dev side not implemented")
-        while widget in self._nested_:
+        if widget in self._nested_:
             widget._unnest_from_(self)
+        while widget in self._nested_:
             self._nested_.remove(widget)
 
     def _place_(self, coord, dims):

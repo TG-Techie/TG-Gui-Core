@@ -61,16 +61,16 @@ class AttributeSpecifier:
     def __init__(self, name, _for_superior=False):
         self._for_superior = _for_superior
         self._name = name
-        self._method = None
+        self._attr = None
 
     def get_attribute(self, widget):
-        method = self._method
-        if self._method is not None:
-            return method
+        attr = self._attr
+        if self._attr is not None:
+            return attr
         else:
             if self._for_superior:  # for the continer's superior
                 widgetfrom = widget._superior_._superior_
             else:  # for the container
                 widgetfrom = widget._superior_
-            self._method = method = getattr(widgetfrom, self._name)
-            return method
+            self._attr = attr = getattr(widgetfrom, self._name)
+            return attr
