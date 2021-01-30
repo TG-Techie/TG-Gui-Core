@@ -1,4 +1,5 @@
 import sys
+import math
 
 sys_impl_name_ = sys.implementation.name
 on_circuitpython_ = sys_impl_name_ in ("circuitpython", "micropython")
@@ -78,6 +79,12 @@ class color:
     gray = 0x909090
     darkgray = 0x606060
     black = 0x000000
+
+    def fromfloats(r, g, b):
+        r = round(255 * r**1.618)
+        g = round(255 * g**1.618)
+        b = round(255 * b**1.618)
+        return (r << 16) | (g << 8) | (b << 0)
 
 
 class Palette:
@@ -262,10 +269,6 @@ class Widget:
     # auto nesting, only for layouts, etc
     # list, zstacks, and others will need to manually nest in their __init__s
     def __get__(self, owner, ownertype=None):
-        #  def __get__(self, owner=None, ownertype=None):
-        # print(f"self={self}, owner={owner}, ownertype={ownertype}")
-        # this adds a side effect to getters
-        # if __debug__: print('__get__', self, owner, f"self.isnested()={self.isnested()}")
         if not self.isnested():
             owner._nest_(self)
         return self
