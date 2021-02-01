@@ -20,57 +20,104 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+from .base import Widget
 from . import dimension_specifiers
 from . import position_specifiers
 
 _singleton = lambda cls: cls()
 
 
-class SpecifierConstructor:
-    def __init__(self, *, name, for_superior):
-        self._for_superior = for_superior
-        self._name = name
-
+class SpecifierConstructor:  # AttributeSpecifier constructor, basically syntactic suger
     def __repr__(self):
-        return f"<Specifier constructor {repr(self._name)}>"
+        return "<SpecifierConstructor 'self'>"
 
     @property
     def width(self):
         global dimension_specifiers
-        return dimension_specifiers.WidthForwardSpecifier(
-            _for_superior=self._for_superior
-        )
+        return dimension_specifiers.WidthForwardSpecifier()
 
     @property
     def height(self):
         global dimension_specifiers
-        return dimension_specifiers.HeightForwardSpecifier(
-            _for_superior=self._for_superior
-        )
+        return dimension_specifiers.HeightForwardSpecifier()
 
-    def __getattr__(self, name):
+    def __getattr__(self, attrname):
         global AttributeSpecifier
-        return AttributeSpecifier(name, _for_superior=self._for_superior)
-
-
-self = SpecifierConstructor(name="self", for_superior=False)
-superior = SpecifierConstructor(name="superior", for_superior=True)
+        return AttributeSpecifier(attrname)
 
 
 class AttributeSpecifier:
-    def __init__(self, name, _for_superior=False):
-        self._for_superior = _for_superior
-        self._name = name
-        self._attr = None
+    def __init__(self, attr_name, *, _previous_spec=None):
+        assert attr_name.startswith("_") == attr_name.startswith(
+            "_"
+        ), f"you cannot specify private attributes, found`.{attr_name}`"
+        self._attr_name = attr_name
+        self._previous_spec = _previous_spec
 
-    def get_attribute(self, widget):
-        attr = self._attr
-        if self._attr is not None:
-            return attr
+    def __repr__(self):
+        return f"<AttributeSpecifier `self.{self._attr_name_chain()}`>"
+
+    def _attr_name_chain(self):
+        if self._previous_spec is None:
+            return self._attr_name
         else:
-            if self._for_superior:  # for the continer's superior
-                widgetfrom = widget._superior_._superior_
-            else:  # for the container
-                widgetfrom = widget._superior_
-            self._attr = attr = getattr(widgetfrom, self._name)
-            return attr
+            return f"{self._previous_spec._attr_name_chain()}.{self._attr_name}"
+
+    def _get_attribute_(self, fromobj):
+        global AttributeSpecifier
+        if self._previous_spec is None:
+            assert isinstance(fromobj, Widget), f"found {fromobj}"
+            fromobj = fromobj._superior_
+        else:
+            assert isinstance(
+                self._previous_spec, AttributeSpecifier
+            ), f"found {fromobj}"
+            fromobj = self._previous_spec._get_attribute_(fromobj)
+        # do not store the attr in self b/c fromobj it could change on a re-place
+        return getattr(fromobj, self._attr_name)
+
+    def __getattr__(self, attr_name):
+        # chain constructor
+        return AttributeSpecifier(attr_name, _previous_spec=self)
+
+    def __call__(self, *args, **kwargs):
+        return ForwardMethodCall(self, args, kwargs)
+
+
+class ForwardMethodCall:
+    def __init__(self, attr_spec, args, kwargs):
+        self._attr_spec = attr_spec
+        self._args = args
+        self._kwargs = kwargs
+
+    def _get_method_(self, widget):
+        assert isinstance(widget, Widget)
+        bound_method = self._attr_spec._get_attribute_(widget)
+
+        # if there are any attribute or method specifiers pased they need to
+        #   be prcessed at the same nest level so they will be processed here
+        args = []
+        for arg in self._args:
+            if isinstance(arg, AttributeSpecifier):
+                args.append(arg._get_attribute_(widget))
+            elif isinstance(arg, ForwardMethodCall):
+                args.append(arg._call_method_(widget))
+            else:
+                args.append(arg)
+        kwargs = {}
+        for kw, arg in self._kwargs.items():
+            if isinstance(arg, AttributeSpecifier):
+                kwargs[kw] = arg._get_attribute_(widget)
+            elif isinstance(arg, ForwardMethodCall):
+                kwargs[kw] = arg._call_method_(widget)
+            else:
+                kwargs[kw] = arg
+
+        return lambda: bound_method(*args, **kwargs)
+
+    def _call_method_(self, widget):
+        self._get_method_(widget)()
+
+
+# for import
+self = SpecifierConstructor()

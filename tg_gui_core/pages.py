@@ -144,7 +144,7 @@ class Pages(Container):
 
     def set_page(self, value):
         if isinstance(value, AttributeError):
-            value = value.get_attribute(self)
+            value = value._get_attribute_(self)
         self._page_key_src.update(value)
 
     def _on_nest_(self):
