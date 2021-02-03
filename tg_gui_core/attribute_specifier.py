@@ -21,7 +21,8 @@
 # THE SOFTWARE.
 
 from .base import Widget
-from . import dimension_specifiers
+
+# from . import dimension_specifiers
 from . import position_specifiers
 
 _singleton = lambda cls: cls()
@@ -31,15 +32,15 @@ class SpecifierConstructor:  # AttributeSpecifier constructor, basically syntact
     def __repr__(self):
         return "<SpecifierConstructor 'self'>"
 
-    @property
-    def width(self):
-        global dimension_specifiers
-        return dimension_specifiers.WidthForwardSpecifier()
-
-    @property
-    def height(self):
-        global dimension_specifiers
-        return dimension_specifiers.HeightForwardSpecifier()
+    # @property
+    # def width(self):
+    #     global dimension_specifiers
+    #     return dimension_specifiers.WidthForwardSpecifier()
+    #
+    # @property
+    # def height(self):
+    #     global dimension_specifiers
+    #     return dimension_specifiers.HeightForwardSpecifier()
 
     def __getattr__(self, attrname):
         global AttributeSpecifier
@@ -98,8 +99,9 @@ class ForwardMethodCall:
             f"{kw}={arg}" for kw, arg in self._kwargs.items()
         )
         return (
-            "<ForwardMethodCall "
-            + f"`{self._attr_spec._source_repr()}({', '.join(arg_stings)})`>"
+            f"<ForwardMethodCall `{self._attr_spec._source_repr()}("
+            + f"{', '.join(repr(s) for s in arg_stings)}"
+            + ")`>"
         )
 
     def _get_method_(self, widget):

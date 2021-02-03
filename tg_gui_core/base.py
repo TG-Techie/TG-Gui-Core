@@ -23,6 +23,7 @@
 
 import random as _random
 
+from .constant_groups import *
 from .layout_classes import *
 from .position_specifiers import *
 from .dimension_specifiers import *
@@ -58,28 +59,6 @@ def clip(lower, value, upper):
 
 def singleinstance(cls):
     return cls()
-
-
-class Constant:
-    def __init__(self, outer, name):
-        self._name = name
-        self._outer = outer
-
-    def __repr__(self):
-        return f"<Constant {self._outer._name}.{self._name}>"
-
-
-class ConstantGroup:
-    def __init__(self, name, subs):
-        self._name = name
-        self._subs = subs_dict = {
-            sub_name: Constant(self, sub_name) for sub_name in subs
-        }
-        for name, sub in subs_dict.items():
-            setattr(self, name, sub)
-
-    def __repr__(self):
-        return f"<ConstantGroup {self._name}>"
 
 
 align = ConstantGroup("align", ("leading", "center", "trailing"))
