@@ -20,7 +20,25 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import random as _random
 
+
+_next_id = _random.randint(0, 11)
+del _random
+
+
+def uid():
+    global _next_id
+    id = _next_id
+    _next_id += 1
+    return id
+
+
+def clamp(lower, value, upper):
+    return min(max(lower, value), upper)
+
+
+# TODO: refactor into pigeon enums with sub-typing
 class Constant:
     def __init__(self, outer, name):
         self._name = name
@@ -28,9 +46,6 @@ class Constant:
 
     def __repr__(self):
         return f"<Constant {self._outer._name}.{self._name}>"
-
-
-# TODO: consider adding ValueConstant for named values
 
 
 class ConstantGroup:

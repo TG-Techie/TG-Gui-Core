@@ -20,60 +20,86 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from .base import *
+from ._shared import uid
 
-# TODO: convert list to dict
+
+def _not(obj):
+    return not obj
 
 
 class State:
     def __init__(self, value, repr=repr):
         self._id_ = uid()
         self._value = value
+
         self._registered = {}
+        self._single_upate_handlers = []
+
         self._repr = repr
 
-    def __get__(self, owner, ownertype):
-        """
-        Used for using states as values in functions, great for button actions.
-        """
-        return self._value
-
-    def __set__(self, owner, value):
-        """
-        Used for using states as values in functions, great for button actions.
-        """
-        self.update(value)
-
-    def update(self, value):
-        previous = self._value
-        if value != previous:
+    def update(self, updater, value):
+        if value != self._value:
             self._value = value
-            self._alert_registered()
+            self._alert_registered(updater)
+
+    def value(self, reader):
+        return self._value
 
     def __repr__(self):
         return f"<{type(self).__name__}:{self._id_} ({self._repr(self._value)})>"
 
-    def getvalue(self, widget, handler):
-        self._register_handler_(widget, handler)
-        return self._value
+    def __get__(self, owner, ownertype):
+        """
+        For using states as values in functions, great for button actions.
+        """
+        return self.value(self)  # called with self as a `.some_state` doesn't care
 
-    def _alert_registered(self):
-        registered = self._registered
-        self._registered = {}
-        for handlers in registered.values():
-            for handler in handlers:
-                handler()
+    def __set__(self, owner, value):
+        """
+        For using states as values in functions, great for button actions.
+        """
+        self.update(self, value)
+        # called with self as an assignmetn should update everybody
 
     def _register_handler_(self, key, handler):
-        if key not in self._registered:
-            self._registered[key] = [handler]
-        else:
-            self._registered[key].append(handler)
+        if key is None:
+            self._single_upate_handlers.append(handler)
+        elif key not in self._registered:
+            if hasattr(key, "_id_"):
+                key = key._id_
+            self._registered[key] = handler
 
-    def _deregister_handlers_(self, key):
+        else:
+            raise ValueError(f"{self} already has a handler registered for  {key}")
+
+    def _deregister_handler_(self, key):
         registered = self._registered
+        if hasattr(key, "_id_"):
+            key = key._id_
         if key in registered:
             registered.pop(key)
+
+    def _alert_registered(self, excluded):
+        excluded_key = getattr(excluded, "_id_", excluded)
+
+        value = self._value
+        for handler in self._single_upate_handlers:
+            handler(value)
+        for key, handler in self._registered.items():
+            if key is not excluded_key:
+                handler(value)
+
+    def __rshift__(self, transform):
+        return DerivedState(self, transform)
+
+    @classmethod
+    def __bool__(cls):
+        raise TypeError(
+            f"'{cls.__name__}' objects cannot be cast to bools, use a DerivedState"
+        )
+
+    def __invert__(self):
+        return DerivedState(self, _not)
 
 
 class DerivedState(State):
@@ -88,34 +114,34 @@ class DerivedState(State):
         self._states = states
         self._fn = fn
 
-        # register and get the new value
-        # start_value = fn(state.getvalue(self, self._on_src_update))
-
         super().__init__(
             value=self,
         )
 
-        self._on_src_update()
+        self._register_with_sources()
+        self._update_from_sources(None)
+
+    def update(self, value):
+        raise TypeError(f"you cannot set the state of {self}, tried to set to {value}")
 
     def __repr__(self):
         return f"<DerivedState:{self._id_} {self._states}>"
 
-    def _on_src_update(self):
+    def _update_from_sources(self, _):
+        value = self._derive_new_state()
+        super().update(self, value)
+
+    def _derive_new_state(self):
+        substates = [state.value(self) for state in self._states]
+        return self._fn(*substates)
+
+    def _register_with_sources(self):
         for state in self._states:
-            state._deregister_handlers_(self)
+            state._register_handler_(self, self._update_from_sources)
 
-        handler = self._on_src_update
-        subvals = [state.getvalue(self, handler) for state in self._states]
-        # fn inline
-        # super().update(self._fn(*subvals))
-        value = self._fn(*subvals)
-        previous = self._value
-        if value != previous:
-            self._value = value
-            self._alert_registered()
-
-    def update(self, value):
-        raise TypeError(f"you cannot set the state of {self}, tried to set to {value}")
+    def _deregister_from_sources(self):
+        for state in self._states:
+            state._deregister_handler_(self)
 
 
 class StatefulAttribute:
@@ -130,6 +156,8 @@ class StatefulAttribute:
         self._initfn = initfn
         self._privname = private_name
         self._updatefn = _updatefn
+
+        print(f"WARNING: `StatefulAttribute` will soon be depricated")
 
     def __call__(self, fn):
         if self._updatefn is None:
@@ -154,7 +182,6 @@ class StatefulAttribute:
         return value
 
     def __set__(self, owner, value):
-        # print('__set__', self, owner, value)
         if value != self._get_val(owner):
             setattr(owner, self._privname, value)
             if self._updatefn is not None:

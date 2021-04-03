@@ -19,11 +19,10 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-"""
-This file is under active development.
-"""
 
-from .constant_groups import ConstantGroup
+# TODO: consider making dim_specs subclasses of spcifiers
+
+from ._shared import ConstantGroup
 
 
 class DimensionSpecifier:
@@ -63,7 +62,6 @@ class DimensionExpression:
 
     def __init__(self, operations, dimension):
         self._is_horizontal = bool(dimension is _dimensions.horizontal)
-        print(self, operations, dimension)
         self._operation_sequence = operations
 
     def __repr__(self):
@@ -86,7 +84,6 @@ class DimensionExpression:
     def _calc_dim(self, dims):
         ops = _operations
         running_value = dims[0] if self._is_horizontal else dims[1]
-        print(self, self._operation_sequence)
         for op, value in self._operation_sequence:
             # if it is also a DimExpr, simplify it
             if isinstance(value, DimensionExpression):
