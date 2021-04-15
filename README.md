@@ -20,7 +20,7 @@ class Application(Layout):
         """place the label and button inside of our layout ("Application")"""
         # calculate the label and button size to be full width and half height
         size = (self.width, self.height//2)
-        # place the widget
+        # place the widgets
         greeting = self.greeting(top, size)
         our_button = self.our_button(below(greeting), size)
 
