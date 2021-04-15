@@ -30,7 +30,7 @@ class Application(Layout):
 
 ## Dependencies
 - Python3.5+ or circuitpython 6.0+
-- Most usage will also require a standard library of widget, this is currently under development
+- Most usage will also require a standard library of widgets, this is currently under development
 - python black
 
 # Contributing
